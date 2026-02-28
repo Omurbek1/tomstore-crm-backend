@@ -34,6 +34,9 @@ export class ProductEntity {
   @Column({ nullable: true })
   supplier?: string;
 
+  @Column({ type: 'varchar', nullable: true, unique: true })
+  barcode?: string;
+
   @Column({ type: 'varchar', nullable: true })
   branchName?: string;
 

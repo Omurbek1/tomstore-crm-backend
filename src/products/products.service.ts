@@ -53,6 +53,13 @@ export class ProductsService {
     return normalized.length > 0 ? normalized : null;
   }
 
+  private normalizeBarcode(value?: string) {
+    const normalized = String(value || '')
+      .trim()
+      .replace(/\s+/g, '');
+    return normalized || undefined;
+  }
+
   findAll(limit?: number, offset?: number) {
     const take = Math.max(1, Math.min(500, Number(limit ?? 200)));
     const skip = Math.max(0, Number(offset ?? 0));
@@ -99,6 +106,13 @@ export class ProductsService {
     const photoUrls = this.normalizePhotoUrls(payload);
     const categories = this.normalizeCategories(payload);
     await this.syncCategories(categories);
+    const barcode = this.normalizeBarcode(payload.barcode);
+    if (barcode) {
+      const exists = await this.productsRepo.findOne({ where: { barcode } });
+      if (exists) {
+        throw new BadRequestException('Штрихкод уже используется');
+      }
+    }
     const product = this.productsRepo.create({
       name: payload.name ?? '',
       category: categories[0],
@@ -106,6 +120,7 @@ export class ProductsService {
       costPrice: isCombo ? 0 : Number(payload.costPrice ?? 0),
       sellingPrice: Number(payload.sellingPrice ?? 0),
       supplier: payload.supplier,
+      barcode,
       branchName: payload.branchName ?? 'Центральный',
       photoUrl: photoUrls?.[0],
       photoUrls,
@@ -196,6 +211,7 @@ export class ProductsService {
 
     const col = {
       name: findCol('name', 'название'),
+      barcode: findCol('barcode', 'штрихкод'),
       categories: findCol('categories', 'category', 'категории', 'категория'),
       costPrice: findCol('costprice', 'cost_price', 'себестоимость'),
       sellingPrice: findCol('sellingprice', 'selling_price', 'цена'),
@@ -251,6 +267,7 @@ export class ProductsService {
           costPrice: Number(value(col.costPrice) || 0),
           sellingPrice,
           supplier: value(col.supplier) || undefined,
+          barcode: value(col.barcode) || undefined,
           branchName:
             value(col.branchName) || options?.branchName || 'Центральный',
           characteristics: value(col.characteristics) || undefined,
@@ -287,6 +304,10 @@ export class ProductsService {
 
     const normalizedPayload: Partial<ProductEntity> = {
       ...payload,
+      barcode:
+        payload.barcode === undefined
+          ? undefined
+          : this.normalizeBarcode(payload.barcode),
       category:
         payload.category !== undefined || payload.categories !== undefined
           ? this.normalizeCategories(payload)[0]
@@ -327,6 +348,15 @@ export class ProductsService {
         : undefined;
     if (categoriesToSync) {
       await this.syncCategories(categoriesToSync);
+    }
+
+    if (normalizedPayload.barcode) {
+      const exists = await this.productsRepo.findOne({
+        where: { barcode: normalizedPayload.barcode },
+      });
+      if (exists && exists.id !== id) {
+        throw new BadRequestException('Штрихкод уже используется');
+      }
     }
 
     await this.productsRepo.update(id, normalizedPayload);

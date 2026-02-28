@@ -16,6 +16,8 @@ import { SaleEntity } from './database/entities/sale.entity';
 import { SupplierEntity } from './database/entities/supplier.entity';
 import { UserEntity } from './database/entities/user.entity';
 import { InventoryMovementEntity } from './database/entities/inventory-movement.entity';
+import { RepairTicketEntity } from './database/entities/repair-ticket.entity';
+import { RepairEventEntity } from './database/entities/repair-event.entity';
 import { ExpensesModule } from './expenses/expenses.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { ProductsModule } from './products/products.module';
@@ -49,6 +51,10 @@ import { AddMaterialFoldersAndLessonOrder1730000000019 } from './database/migrat
 import { AddUserMultiRoleAndFixedSalary1730000000020 } from './database/migrations/1730000000020-AddUserMultiRoleAndFixedSalary';
 import { AddTargetRewardIssueState1730000000021 } from './database/migrations/1730000000021-AddTargetRewardIssueState';
 import { AddTargetRewardTypeAndText1730000000022 } from './database/migrations/1730000000022-AddTargetRewardTypeAndText';
+import { AddUserCanManageProducts1730000000023 } from './database/migrations/1730000000023-AddUserCanManageProducts';
+import { AddRepairs1730000000024 } from './database/migrations/1730000000024-AddRepairs';
+import { AddProductBarcode1730000000025 } from './database/migrations/1730000000025-AddProductBarcode';
+import { RepairsModule } from './repairs/repairs.module';
 
 @Module({
   imports: [
@@ -73,6 +79,8 @@ import { AddTargetRewardTypeAndText1730000000022 } from './database/migrations/1
         ExpenseEntity,
         BonusTargetEntity,
         InventoryMovementEntity,
+        RepairTicketEntity,
+        RepairEventEntity,
       ],
       migrations: [
         InitSchema1730000000000,
@@ -98,6 +106,9 @@ import { AddTargetRewardTypeAndText1730000000022 } from './database/migrations/1
         AddUserMultiRoleAndFixedSalary1730000000020,
         AddTargetRewardIssueState1730000000021,
         AddTargetRewardTypeAndText1730000000022,
+        AddUserCanManageProducts1730000000023,
+        AddRepairs1730000000024,
+        AddProductBarcode1730000000025,
       ],
       migrationsRun: true,
       migrationsTableName: 'migrations',
@@ -116,6 +127,7 @@ import { AddTargetRewardTypeAndText1730000000022 } from './database/migrations/1
     BranchesModule,
     SettingsModule,
     MaterialsModule,
+    RepairsModule,
   ],
 })
 export class AppModule {}

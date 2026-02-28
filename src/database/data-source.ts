@@ -14,6 +14,8 @@ import { SaleEntity } from './entities/sale.entity';
 import { SupplierEntity } from './entities/supplier.entity';
 import { UserEntity } from './entities/user.entity';
 import { InventoryMovementEntity } from './entities/inventory-movement.entity';
+import { RepairTicketEntity } from './entities/repair-ticket.entity';
+import { RepairEventEntity } from './entities/repair-event.entity';
 import { InitSchema1730000000000 } from './migrations/1730000000000-InitSchema';
 import { AddProductManagerPercent1730000000001 } from './migrations/1730000000001-AddProductManagerPercent';
 import { AddProductMediaAndCharacteristics1730000000002 } from './migrations/1730000000002-AddProductMediaAndCharacteristics';
@@ -38,6 +40,8 @@ import { AddUserMultiRoleAndFixedSalary1730000000020 } from './migrations/173000
 import { AddTargetRewardIssueState1730000000021 } from './migrations/1730000000021-AddTargetRewardIssueState';
 import { AddTargetRewardTypeAndText1730000000022 } from './migrations/1730000000022-AddTargetRewardTypeAndText';
 import { AddUserCanManageProducts1730000000023 } from './migrations/1730000000023-AddUserCanManageProducts';
+import { AddRepairs1730000000024 } from './migrations/1730000000024-AddRepairs';
+import { AddProductBarcode1730000000025 } from './migrations/1730000000025-AddProductBarcode';
 
 export default new DataSource({
   type: 'postgres',
@@ -60,6 +64,8 @@ export default new DataSource({
     ExpenseEntity,
     BonusTargetEntity,
     InventoryMovementEntity,
+    RepairTicketEntity,
+    RepairEventEntity,
   ],
   migrations: [
     InitSchema1730000000000,
@@ -86,6 +92,8 @@ export default new DataSource({
     AddTargetRewardIssueState1730000000021,
     AddTargetRewardTypeAndText1730000000022,
     AddUserCanManageProducts1730000000023,
+    AddRepairs1730000000024,
+    AddProductBarcode1730000000025,
   ],
   synchronize: false,
 });

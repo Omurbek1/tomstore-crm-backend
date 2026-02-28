@@ -34,10 +34,12 @@ export class ProductsController {
   findAll(
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
+    @Query('all') allRaw?: string,
   ) {
     const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
     const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.productsService.findAll(limit, offset);
+    const all = allRaw === '1' || allRaw === 'true';
+    return this.productsService.findAll(limit, offset, all);
   }
 
   @Post()

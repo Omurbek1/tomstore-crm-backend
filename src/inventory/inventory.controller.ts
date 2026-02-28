@@ -33,10 +33,18 @@ export class InventoryController {
     @Query('branchName') branchName?: string,
     @Query('limit') limitRaw?: string,
     @Query('offset') offsetRaw?: string,
+    @Query('all') allRaw?: string,
   ) {
     const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
     const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.inventoryService.findProductStock(q, branchName, limit, offset);
+    const all = allRaw === '1' || allRaw === 'true';
+    return this.inventoryService.findProductStock(
+      q,
+      branchName,
+      limit,
+      offset,
+      all,
+    );
   }
 
   @Get('movements')

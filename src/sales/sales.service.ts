@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryMovementEntity } from '../database/entities/inventory-movement.entity';
+import { AppSettingEntity } from '../database/entities/app-setting.entity';
+import { CashShiftEntity } from '../database/entities/cash-shift.entity';
 import { ProductEntity } from '../database/entities/product.entity';
 import { SaleEntity } from '../database/entities/sale.entity';
 import { UserEntity } from '../database/entities/user.entity';
@@ -14,6 +16,19 @@ const ALLOWED_INSTALLMENT_MONTHS: Record<string, number[]> = {
   МКК: [3, 6, 9],
 };
 
+type SalesFindParams = {
+  limit?: number;
+  offset?: number;
+  all?: boolean;
+  managerId?: string;
+  branch?: string;
+  shiftId?: string;
+  paymentType?: string;
+  q?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
 @Injectable()
 export class SalesService {
   constructor(
@@ -23,16 +38,82 @@ export class SalesService {
     private readonly productsRepo: Repository<ProductEntity>,
     @InjectRepository(UserEntity)
     private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(CashShiftEntity)
+    private readonly shiftsRepo: Repository<CashShiftEntity>,
+    @InjectRepository(AppSettingEntity)
+    private readonly settingsRepo: Repository<AppSettingEntity>,
   ) {}
 
-  findAll(limit?: number, offset?: number) {
-    const take = Math.max(1, Math.min(500, Number(limit ?? 200)));
-    const skip = Math.max(0, Number(offset ?? 0));
-    return this.salesRepo.find({
-      order: { createdAt: 'DESC' },
-      take,
-      skip,
+  private async ensureManualPaymentTypesColumn() {
+    await this.settingsRepo.query(
+      `ALTER TABLE "app_settings" ADD COLUMN IF NOT EXISTS "manualPaymentTypes" text[] NOT NULL DEFAULT '{}'`,
+    );
+  }
+
+  private async getManualPaymentTypes(): Promise<string[]> {
+    await this.ensureManualPaymentTypesColumn();
+    const [settings] = await this.settingsRepo.find({
+      order: { createdAt: 'ASC' },
+      take: 1,
     });
+    if (!settings?.manualPaymentTypes?.length) return [];
+    const values = settings.manualPaymentTypes
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => {
+        const lower = item.toLowerCase();
+        return lower !== 'hybrid' && lower !== 'гибрид';
+      });
+    return Array.from(new Set(values));
+  }
+
+  findAll(params?: SalesFindParams) {
+    const take = Math.max(1, Math.min(500, Number(params?.limit ?? 200)));
+    const skip = Math.max(0, Number(params?.offset ?? 0));
+    const qb = this.salesRepo
+      .createQueryBuilder('sale')
+      .orderBy('sale.createdAt', 'DESC');
+
+    if (params?.managerId?.trim()) {
+      qb.andWhere('sale.managerId = :managerId', {
+        managerId: params.managerId.trim(),
+      });
+    }
+    if (params?.branch?.trim()) {
+      qb.andWhere('sale.branch = :branch', { branch: params.branch.trim() });
+    }
+    if (params?.shiftId?.trim()) {
+      qb.andWhere('sale.shiftId = :shiftId', { shiftId: params.shiftId.trim() });
+    }
+    if (params?.paymentType?.trim()) {
+      qb.andWhere('sale.paymentType = :paymentType', {
+        paymentType: params.paymentType.trim(),
+      });
+    }
+    if (params?.q?.trim()) {
+      const q = `%${params.q.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(sale.productName) LIKE :q OR LOWER(COALESCE(sale.clientName, \'\')) LIKE :q)',
+        { q },
+      );
+    }
+    if (params?.dateFrom) {
+      const dateFrom = new Date(params.dateFrom);
+      if (!Number.isNaN(dateFrom.getTime())) {
+        qb.andWhere('sale.createdAt >= :dateFrom', { dateFrom });
+      }
+    }
+    if (params?.dateTo) {
+      const dateTo = new Date(params.dateTo);
+      if (!Number.isNaN(dateTo.getTime())) {
+        qb.andWhere('sale.createdAt <= :dateTo', { dateTo });
+      }
+    }
+
+    if (!params?.all) {
+      qb.take(take).skip(skip);
+    }
+    return qb.getMany();
   }
 
   async create(payload: Partial<SaleEntity>) {
@@ -62,6 +143,7 @@ export class SalesService {
     const paymentLabel = String(payload.paymentLabel ?? '').trim();
     const bookingDeposit = Number(payload.bookingDeposit ?? 0);
     const bookingBuyout = Number(payload.bookingBuyout ?? 0);
+    const shiftId = payload.shiftId ? String(payload.shiftId).trim() : undefined;
     if (!Number.isFinite(quantity) || quantity <= 0) {
       throw new BadRequestException('Количество должно быть больше 0');
     }
@@ -91,6 +173,39 @@ export class SalesService {
       ) {
         throw new BadRequestException(
           'Для региональной брони сумма предоплаты и выкупа должна совпадать с суммой заказа',
+        );
+      }
+    }
+    if (payload.paymentType === 'manual') {
+      const allowedManualTypes = await this.getManualPaymentTypes();
+      const normalizedLabel = String(payload.paymentLabel || '').trim();
+      if (!normalizedLabel) {
+        throw new BadRequestException(
+          'Для ручного типа оплаты укажите канал оплаты',
+        );
+      }
+      if (
+        !allowedManualTypes.some(
+          (type) => type.toLowerCase() === normalizedLabel.toLowerCase(),
+        )
+      ) {
+        throw new BadRequestException(
+          'Этот ручной тип оплаты недоступен. Добавьте его в Настройках (admin/superadmin).',
+        );
+      }
+    }
+
+    if (shiftId) {
+      const shift = await this.shiftsRepo.findOne({ where: { id: shiftId } });
+      if (!shift) {
+        throw new BadRequestException('Смена не найдена');
+      }
+      if (shift.status !== 'open') {
+        throw new BadRequestException('Смена закрыта');
+      }
+      if (payload.managerId && shift.cashierId !== payload.managerId) {
+        throw new BadRequestException(
+          'Продажа не может быть привязана к чужой смене',
         );
       }
     }
@@ -190,6 +305,7 @@ export class SalesService {
         total: resolvedTotal,
         discount,
         branch: payload.branch ?? currentProduct?.branchName ?? 'Центральный',
+        shiftId,
         paymentType: payload.paymentType ?? 'cash',
         paymentLabel:
           payload.paymentType === 'installment'

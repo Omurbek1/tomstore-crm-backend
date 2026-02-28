@@ -17,6 +17,9 @@ export class AppSettingEntity {
   @Column({ nullable: true })
   companyLogoUrl?: string;
 
+  @Column('text', { array: true, default: () => "'{}'" })
+  manualPaymentTypes: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

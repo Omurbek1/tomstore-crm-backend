@@ -209,8 +209,31 @@ export class UsersService {
       SELECT
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1), 0) AS "earned",
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1 AND s."createdAt" >= date_trunc('month', now())), 0) AS "earnedMonth",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1), 0) AS "bonuses",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1 AND b."createdAt" >= date_trunc('month', now())), 0) AS "bonusesMonth",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaid",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND b."createdAt" >= date_trunc('month', now())
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaidMonth",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф')), 0) AS "advances",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "advancesMonth"
       `,
@@ -219,10 +242,12 @@ export class UsersService {
 
     const isFixed = user.salaryType === 'fixed';
     const earned = Number((isFixed ? row?.earnedMonth : row?.earned) ?? 0);
-    const bonuses = Number((isFixed ? row?.bonusesMonth : row?.bonuses) ?? 0);
+    const bonuses = Number(
+      (isFixed ? row?.salaryPaidMonth : row?.salaryPaid) ?? 0,
+    );
     const advances = Number((isFixed ? row?.advancesMonth : row?.advances) ?? 0);
     const fixedBase = isFixed ? Number(user.fixedMonthlySalary ?? 0) : 0;
-    const available = fixedBase + earned + bonuses - advances;
+    const available = fixedBase + earned - bonuses - advances;
 
     return {
       managerId: id,

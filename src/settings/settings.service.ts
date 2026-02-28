@@ -10,14 +10,34 @@ export class SettingsService {
     private readonly settingsRepo: Repository<AppSettingEntity>,
   ) {}
 
+  private async ensureManualPaymentTypesColumn() {
+    await this.settingsRepo.query(
+      `ALTER TABLE "app_settings" ADD COLUMN IF NOT EXISTS "manualPaymentTypes" text[] NOT NULL DEFAULT '{}'`,
+    );
+  }
+
   private async ensureSettings() {
+    await this.ensureManualPaymentTypesColumn();
     const [first] = await this.settingsRepo.find({
       order: { createdAt: 'ASC' },
       take: 1,
     });
     if (first) return first;
-    const created = this.settingsRepo.create({ companyName: 'TOMSTORE' });
+    const created = this.settingsRepo.create({
+      companyName: 'TOMSTORE',
+      manualPaymentTypes: [],
+    });
     return this.settingsRepo.save(created);
+  }
+
+  private normalizeManualPaymentTypes(value: unknown): string[] {
+    const blocked = new Set(['hybrid', 'гибрид']);
+    const input = Array.isArray(value) ? value : [];
+    const normalized = input
+      .map((item) => String(item ?? '').trim())
+      .filter(Boolean)
+      .filter((item) => !blocked.has(item.toLowerCase()));
+    return Array.from(new Set(normalized));
   }
 
   getSettings() {
@@ -32,6 +52,10 @@ export class SettingsService {
           ? String(payload.companyName || '').trim() || current.companyName
           : current.companyName,
       companyLogoUrl: payload.companyLogoUrl,
+      manualPaymentTypes:
+        payload.manualPaymentTypes !== undefined
+          ? this.normalizeManualPaymentTypes(payload.manualPaymentTypes)
+          : current.manualPaymentTypes || [],
     } as Partial<AppSettingEntity>;
     await this.settingsRepo.update(current.id, next);
     return this.settingsRepo.findOneByOrFail({ id: current.id });

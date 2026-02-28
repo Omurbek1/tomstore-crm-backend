@@ -34,12 +34,32 @@ export class BonusesService {
       throw new BadRequestException('amount must be greater than 0');
     }
 
-    const balance = await this.getManagerPayoutBalance(payload.managerId);
-    const nextBalance = balance.currentBalance - amount;
-    if (nextBalance < 0) {
-      throw new BadRequestException(
-        `Payout exceeds available limit. Max payable: ${Math.max(0, balance.currentBalance).toFixed(2)}, debt after payout: ${Math.abs(nextBalance).toFixed(2)}`,
-      );
+    const rawReason = String(payload.reason || '').trim();
+    const isCompanyBonus =
+      rawReason.startsWith('BONUS::') ||
+      rawReason.startsWith('TARGET_BONUS::');
+    const reason = rawReason
+      ? rawReason
+      : isCompanyBonus
+        ? 'BONUS::Бонус от компании'
+        : 'SALARY::Выплата ЗП';
+    const normalizedReason =
+      !isCompanyBonus &&
+      !reason.startsWith('SALARY::') &&
+      !reason.startsWith('BONUS::') &&
+      !reason.startsWith('TARGET_BONUS::')
+        ? `SALARY::${reason}`
+        : reason;
+
+    let nextBalance: number | null = null;
+    if (!isCompanyBonus) {
+      const balance = await this.getManagerPayoutBalance(payload.managerId);
+      nextBalance = balance.currentBalance - amount;
+      if (nextBalance < 0) {
+        throw new BadRequestException(
+          `Payout exceeds available limit. Max payable: ${Math.max(0, balance.currentBalance).toFixed(2)}, debt after payout: ${Math.abs(nextBalance).toFixed(2)}`,
+        );
+      }
     }
 
     const manager = payload.managerId
@@ -50,15 +70,15 @@ export class BonusesService {
       managerId: payload.managerId,
       managerName: payload.managerName ?? manager?.name ?? 'Unknown',
       amount,
-      reason: payload.reason ?? 'Без комментария',
+      reason: normalizedReason,
       addedBy: payload.addedBy,
     });
 
     const saved = await this.bonusesRepo.save(bonus);
     return {
       ...saved,
-      maxPayable: Math.max(0, nextBalance),
-      debt: Math.max(0, -nextBalance),
+      maxPayable: nextBalance === null ? null : Math.max(0, nextBalance),
+      debt: nextBalance === null ? 0 : Math.max(0, -nextBalance),
       currentBalance: nextBalance,
     };
   }
@@ -70,8 +90,31 @@ export class BonusesService {
       SELECT
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1), 0) AS "salesEarnings",
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1 AND s."createdAt" >= date_trunc('month', now())), 0) AS "salesEarningsMonth",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1), 0) AS "bonusesPaid",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1 AND b."createdAt" >= date_trunc('month', now())), 0) AS "bonusesPaidMonth",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaid",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND b."createdAt" >= date_trunc('month', now())
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaidMonth",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф')), 0) AS "advancesAndPenaltiesPaid",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "advancesAndPenaltiesPaidMonth"
       `,
@@ -83,7 +126,7 @@ export class BonusesService {
       (isFixed ? row?.salesEarningsMonth : row?.salesEarnings) ?? 0,
     );
     const bonusesPaid = Number(
-      (isFixed ? row?.bonusesPaidMonth : row?.bonusesPaid) ?? 0,
+      (isFixed ? row?.salaryPaidMonth : row?.salaryPaid) ?? 0,
     );
     const advancesAndPenaltiesPaid = Number(
       (isFixed
@@ -92,7 +135,7 @@ export class BonusesService {
     );
     const fixedBase = isFixed ? Number(user?.fixedMonthlySalary ?? 0) : 0;
     const currentBalance =
-      fixedBase + salesEarnings + bonusesPaid - advancesAndPenaltiesPaid;
+      fixedBase + salesEarnings - bonusesPaid - advancesAndPenaltiesPaid;
 
     return {
       fixedBase,

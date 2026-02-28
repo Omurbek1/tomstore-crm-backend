@@ -47,6 +47,9 @@ export class SaleEntity {
   @Column({ default: 'Центральный' })
   branch: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  shiftId?: string;
+
   @Column({ type: 'varchar', default: 'cash' })
   paymentType: 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual';
 

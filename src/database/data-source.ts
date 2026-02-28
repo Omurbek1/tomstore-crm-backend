@@ -16,6 +16,10 @@ import { UserEntity } from './entities/user.entity';
 import { InventoryMovementEntity } from './entities/inventory-movement.entity';
 import { RepairTicketEntity } from './entities/repair-ticket.entity';
 import { RepairEventEntity } from './entities/repair-event.entity';
+import { CashShiftEntity } from './entities/cash-shift.entity';
+import { TaskEntity } from './entities/task.entity';
+import { MarketingKpiEntity } from './entities/marketing-kpi.entity';
+import { AiMemoryEntity } from './entities/ai-memory.entity';
 import { InitSchema1730000000000 } from './migrations/1730000000000-InitSchema';
 import { AddProductManagerPercent1730000000001 } from './migrations/1730000000001-AddProductManagerPercent';
 import { AddProductMediaAndCharacteristics1730000000002 } from './migrations/1730000000002-AddProductMediaAndCharacteristics';
@@ -42,6 +46,15 @@ import { AddTargetRewardTypeAndText1730000000022 } from './migrations/1730000000
 import { AddUserCanManageProducts1730000000023 } from './migrations/1730000000023-AddUserCanManageProducts';
 import { AddRepairs1730000000024 } from './migrations/1730000000024-AddRepairs';
 import { AddProductBarcode1730000000025 } from './migrations/1730000000025-AddProductBarcode';
+import { AddCashShifts1730000000026 } from './migrations/1730000000026-AddCashShifts';
+import { AddSaleShiftId1730000000027 } from './migrations/1730000000027-AddSaleShiftId';
+import { AddCashShiftDebtFields1730000000028 } from './migrations/1730000000028-AddCashShiftDebtFields';
+import { AddSettingsManualPaymentTypes1730000000029 } from './migrations/1730000000029-AddSettingsManualPaymentTypes';
+import { AddTasks1730000000030 } from './migrations/1730000000030-AddTasks';
+import { AddMarketingKpi1730000000031 } from './migrations/1730000000031-AddMarketingKpi';
+import { AddMarketingKpiPlanModeAndItems1730000000032 } from './migrations/1730000000032-AddMarketingKpiPlanModeAndItems';
+import { AddTargetStartDate1730000000033 } from './migrations/1730000000033-AddTargetStartDate';
+import { AddAiMemory1730000000034 } from './migrations/1730000000034-AddAiMemory';
 
 export default new DataSource({
   type: 'postgres',
@@ -66,6 +79,10 @@ export default new DataSource({
     InventoryMovementEntity,
     RepairTicketEntity,
     RepairEventEntity,
+    CashShiftEntity,
+    TaskEntity,
+    MarketingKpiEntity,
+    AiMemoryEntity,
   ],
   migrations: [
     InitSchema1730000000000,
@@ -94,6 +111,15 @@ export default new DataSource({
     AddUserCanManageProducts1730000000023,
     AddRepairs1730000000024,
     AddProductBarcode1730000000025,
+    AddCashShifts1730000000026,
+    AddSaleShiftId1730000000027,
+    AddCashShiftDebtFields1730000000028,
+    AddSettingsManualPaymentTypes1730000000029,
+    AddTasks1730000000030,
+    AddMarketingKpi1730000000031,
+    AddMarketingKpiPlanModeAndItems1730000000032,
+    AddTargetStartDate1730000000033,
+    AddAiMemory1730000000034,
   ],
   synchronize: false,
 });

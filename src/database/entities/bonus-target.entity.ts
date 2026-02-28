@@ -30,6 +30,9 @@ export class BonusTargetEntity {
   rewardText?: string | null;
 
   @Column({ type: 'timestamptz', nullable: true })
+  startDate?: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
   deadline?: Date;
 
   @Column({ type: 'boolean', default: false })

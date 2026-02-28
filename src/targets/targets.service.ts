@@ -29,8 +29,9 @@ export class TargetsService {
     });
   }
 
-  create(payload: Partial<BonusTargetEntity>) {
-    const rewardType = payload.rewardType === 'material' ? 'material' : 'money';
+  private normalizeTargetPayload(payload: Partial<BonusTargetEntity>) {
+    const rewardType: 'money' | 'material' =
+      payload.rewardType === 'material' ? 'material' : 'money';
     const rewardText =
       rewardType === 'material'
         ? String(payload.rewardText || '').trim()
@@ -43,20 +44,73 @@ export class TargetsService {
         'Для материальной награды укажите текст (например: ноутбук, туризм)',
       );
     }
-    if (rewardType === 'money' && (!Number.isFinite(rewardAmount) || rewardAmount <= 0)) {
-      throw new BadRequestException('Для денежной награды сумма должна быть больше 0');
+
+    if (
+      rewardType === 'money' &&
+      (!Number.isFinite(rewardAmount) || rewardAmount < 0)
+    ) {
+      throw new BadRequestException(
+        'Для денежной награды сумма должна быть не меньше 0',
+      );
     }
 
-    const target = this.targetsRepo.create({
+    const targetAmount = Number(payload.amount ?? 0);
+    if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
+      throw new BadRequestException('План продаж должен быть больше 0');
+    }
+
+    const startDate = payload.startDate ? new Date(payload.startDate) : undefined;
+    const deadline = payload.deadline ? new Date(payload.deadline) : undefined;
+    if (startDate && deadline && startDate.getTime() > deadline.getTime()) {
+      throw new BadRequestException('Дата начала не может быть позже даты окончания');
+    }
+
+    return {
       type: payload.type ?? 'global',
       managerId: payload.managerId,
-      amount: Number(payload.amount ?? 0),
+      amount: targetAmount,
       reward: rewardAmount,
       rewardType,
       rewardText: rewardText || null,
-      deadline: payload.deadline,
+      startDate,
+      deadline,
+    };
+  }
+
+  create(payload: Partial<BonusTargetEntity>) {
+    const normalized = this.normalizeTargetPayload(payload);
+
+    const target = this.targetsRepo.create({
+      ...normalized,
       rewardIssued: false,
     });
+
+    return this.targetsRepo.save(target);
+  }
+
+  async update(id: string, payload: Partial<BonusTargetEntity>) {
+    const target = await this.targetsRepo.findOne({ where: { id } });
+    if (!target) {
+      throw new NotFoundException('Цель не найдена');
+    }
+
+    if (target.rewardIssued) {
+      throw new BadRequestException('Нельзя редактировать цель после выдачи бонуса');
+    }
+
+    const normalized = this.normalizeTargetPayload({
+      ...target,
+      ...payload,
+    });
+
+    target.type = normalized.type;
+    target.managerId = normalized.managerId;
+    target.amount = normalized.amount;
+    target.reward = normalized.reward;
+    target.rewardType = normalized.rewardType;
+    target.rewardText = normalized.rewardText;
+    target.startDate = normalized.startDate;
+    target.deadline = normalized.deadline;
 
     return this.targetsRepo.save(target);
   }
@@ -87,11 +141,11 @@ export class TargetsService {
         : 'Отдел продаж';
 
     let savedBonus: BonusEntity | null = null;
-    if (target.rewardType === 'money') {
+    if (target.rewardType === 'money' && Number(target.reward || 0) > 0) {
       const reason =
         target.type === 'personal'
-          ? `Бонус за личную цель (${id.slice(0, 8)})`
-          : `Бонус за общую цель (${id.slice(0, 8)})`;
+          ? `TARGET_BONUS::Бонус за личную цель (${id.slice(0, 8)})`
+          : `TARGET_BONUS::Бонус за общую цель (${id.slice(0, 8)})`;
 
       const bonus = this.bonusesRepo.create({
         managerId: target.type === 'personal' ? target.managerId : undefined,

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { BonusTargetEntity } from '../database/entities/bonus-target.entity';
 import { TargetsService } from './targets.service';
 
@@ -19,6 +19,11 @@ export class TargetsController {
   @Post()
   create(@Body() body: Partial<BonusTargetEntity>) {
     return this.targetsService.create(body);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: Partial<BonusTargetEntity>) {
+    return this.targetsService.update(id, body);
   }
 
   @Post(':id/issue-reward')

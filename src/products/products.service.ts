@@ -60,9 +60,14 @@ export class ProductsService {
     return normalized || undefined;
   }
 
-  findAll(limit?: number, offset?: number) {
+  findAll(limit?: number, offset?: number, all?: boolean) {
     const take = Math.max(1, Math.min(500, Number(limit ?? 200)));
     const skip = Math.max(0, Number(offset ?? 0));
+    if (all) {
+      return this.productsRepo.find({
+        order: { createdAt: 'DESC' },
+      });
+    }
     return this.productsRepo.find({
       order: { createdAt: 'DESC' },
       take,

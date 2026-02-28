@@ -76,8 +76,31 @@ export class ExpensesService {
       SELECT
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1), 0) AS "salesEarnings",
         COALESCE((SELECT SUM(s."managerEarnings") FROM sales s WHERE s."managerId" = $1 AND s."createdAt" >= date_trunc('month', now())), 0) AS "salesEarningsMonth",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1), 0) AS "bonusesPaid",
-        COALESCE((SELECT SUM(b."amount") FROM bonuses b WHERE b."managerId" = $1 AND b."createdAt" >= date_trunc('month', now())), 0) AS "bonusesPaidMonth",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaid",
+        COALESCE((
+          SELECT SUM(b."amount")
+          FROM bonuses b
+          WHERE b."managerId" = $1
+            AND b."createdAt" >= date_trunc('month', now())
+            AND (
+              b."reason" LIKE 'SALARY::%'
+              OR (
+                b."reason" NOT LIKE 'BONUS::%'
+                AND b."reason" NOT LIKE 'TARGET_BONUS::%'
+              )
+            )
+        ), 0) AS "salaryPaidMonth",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф')), 0) AS "advancesAndPenaltiesPaid",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "advancesAndPenaltiesPaidMonth"
       `,
@@ -89,7 +112,7 @@ export class ExpensesService {
       (isFixed ? row?.salesEarningsMonth : row?.salesEarnings) ?? 0,
     );
     const bonusesPaid = Number(
-      (isFixed ? row?.bonusesPaidMonth : row?.bonusesPaid) ?? 0,
+      (isFixed ? row?.salaryPaidMonth : row?.salaryPaid) ?? 0,
     );
     const advancesAndPenaltiesPaid = Number(
       (isFixed
@@ -98,7 +121,7 @@ export class ExpensesService {
     );
     const fixedBase = isFixed ? Number(user?.fixedMonthlySalary ?? 0) : 0;
     const currentBalance =
-      fixedBase + salesEarnings + bonusesPaid - advancesAndPenaltiesPaid;
+      fixedBase + salesEarnings - bonusesPaid - advancesAndPenaltiesPaid;
 
     return {
       fixedBase,

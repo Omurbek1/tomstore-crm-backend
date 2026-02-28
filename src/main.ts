@@ -1,7 +1,10 @@
 import 'dotenv/config';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { existsSync, mkdirSync } from 'fs';
 import { Client } from 'pg';
+import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function ensureDatabaseExists(): Promise<void> {
@@ -9,8 +12,7 @@ async function ensureDatabaseExists(): Promise<void> {
   const port = Number(process.env.DB_PORT ?? 5432);
   const user = process.env.DB_USERNAME ?? 'postgres';
   const password = process.env.DB_PASSWORD ?? 'postgres';
-  const database =
-    process.env.DB_NAME ?? process.env.DB_DATABASE ?? 'tomstore';
+  const database = process.env.DB_NAME ?? process.env.DB_DATABASE ?? 'tomstore';
   const maintenanceDb = process.env.DB_ADMIN_DB ?? 'postgres';
 
   const client = new Client({
@@ -40,7 +42,12 @@ async function ensureDatabaseExists(): Promise<void> {
 async function bootstrap() {
   await ensureDatabaseExists();
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const uploadsDir = join(process.cwd(), 'uploads');
+  if (!existsSync(uploadsDir)) {
+    mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads/' });
   app.enableCors({
     origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
     credentials: true,

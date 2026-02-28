@@ -3,12 +3,41 @@ import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { BonusTargetEntity } from './entities/bonus-target.entity';
 import { BonusEntity } from './entities/bonus.entity';
+import { BranchEntity } from './entities/branch.entity';
 import { ExpenseEntity } from './entities/expense.entity';
 import { ProductEntity } from './entities/product.entity';
+import { ProductCategoryEntity } from './entities/product-category.entity';
+import { AppSettingEntity } from './entities/app-setting.entity';
+import { TrainingMaterialFolderEntity } from './entities/training-material-folder.entity';
+import { TrainingMaterialEntity } from './entities/training-material.entity';
 import { SaleEntity } from './entities/sale.entity';
 import { SupplierEntity } from './entities/supplier.entity';
 import { UserEntity } from './entities/user.entity';
+import { InventoryMovementEntity } from './entities/inventory-movement.entity';
 import { InitSchema1730000000000 } from './migrations/1730000000000-InitSchema';
+import { AddProductManagerPercent1730000000001 } from './migrations/1730000000001-AddProductManagerPercent';
+import { AddProductMediaAndCharacteristics1730000000002 } from './migrations/1730000000002-AddProductMediaAndCharacteristics';
+import { AddSupplierAddress1730000000003 } from './migrations/1730000000003-AddSupplierAddress';
+import { AddUsersDeletedFlag1730000000004 } from './migrations/1730000000004-AddUsersDeletedFlag';
+import { AddUserProfileFields1730000000005 } from './migrations/1730000000005-AddUserProfileFields';
+import { AddUserBirthDateAndPhoto1730000000006 } from './migrations/1730000000006-AddUserBirthDateAndPhoto';
+import { AddInventory1730000000007 } from './migrations/1730000000007-AddInventory';
+import { AddComboProducts1730000000008 } from './migrations/1730000000008-AddComboProducts';
+import { AddProductPhotoUrls1730000000009 } from './migrations/1730000000009-AddProductPhotoUrls';
+import { AddProductCategories1730000000010 } from './migrations/1730000000010-AddProductCategories';
+import { AddSaleDiscount1730000000011 } from './migrations/1730000000011-AddSaleDiscount';
+import { AddBranchesAndUserBranch1730000000012 } from './migrations/1730000000012-AddBranchesAndUserBranch';
+import { AddProductAndInventoryBranch1730000000013 } from './migrations/1730000000013-AddProductAndInventoryBranch';
+import { AddPaymentDetails1730000000014 } from './migrations/1730000000014-AddPaymentDetails';
+import { AddBookingBuyout1730000000015 } from './migrations/1730000000015-AddBookingBuyout';
+import { AddProductCategoryDictionary1730000000016 } from './migrations/1730000000016-AddProductCategoryDictionary';
+import { AddInventoryOperationType1730000000017 } from './migrations/1730000000017-AddInventoryOperationType';
+import { AddSettingsAndMaterials1730000000018 } from './migrations/1730000000018-AddSettingsAndMaterials';
+import { AddMaterialFoldersAndLessonOrder1730000000019 } from './migrations/1730000000019-AddMaterialFoldersAndLessonOrder';
+import { AddUserMultiRoleAndFixedSalary1730000000020 } from './migrations/1730000000020-AddUserMultiRoleAndFixedSalary';
+import { AddTargetRewardIssueState1730000000021 } from './migrations/1730000000021-AddTargetRewardIssueState';
+import { AddTargetRewardTypeAndText1730000000022 } from './migrations/1730000000022-AddTargetRewardTypeAndText';
+import { AddUserCanManageProducts1730000000023 } from './migrations/1730000000023-AddUserCanManageProducts';
 
 export default new DataSource({
   type: 'postgres',
@@ -20,12 +49,43 @@ export default new DataSource({
   entities: [
     UserEntity,
     ProductEntity,
+    ProductCategoryEntity,
+    AppSettingEntity,
+    TrainingMaterialFolderEntity,
+    TrainingMaterialEntity,
+    BranchEntity,
     SaleEntity,
     SupplierEntity,
     BonusEntity,
     ExpenseEntity,
     BonusTargetEntity,
+    InventoryMovementEntity,
   ],
-  migrations: [InitSchema1730000000000],
+  migrations: [
+    InitSchema1730000000000,
+    AddProductManagerPercent1730000000001,
+    AddProductMediaAndCharacteristics1730000000002,
+    AddSupplierAddress1730000000003,
+    AddUsersDeletedFlag1730000000004,
+    AddUserProfileFields1730000000005,
+    AddUserBirthDateAndPhoto1730000000006,
+    AddInventory1730000000007,
+    AddComboProducts1730000000008,
+    AddProductPhotoUrls1730000000009,
+    AddProductCategories1730000000010,
+    AddSaleDiscount1730000000011,
+    AddBranchesAndUserBranch1730000000012,
+    AddProductAndInventoryBranch1730000000013,
+    AddPaymentDetails1730000000014,
+    AddBookingBuyout1730000000015,
+    AddProductCategoryDictionary1730000000016,
+    AddInventoryOperationType1730000000017,
+    AddSettingsAndMaterials1730000000018,
+    AddMaterialFoldersAndLessonOrder1730000000019,
+    AddUserMultiRoleAndFixedSalary1730000000020,
+    AddTargetRewardIssueState1730000000021,
+    AddTargetRewardTypeAndText1730000000022,
+    AddUserCanManageProducts1730000000023,
+  ],
   synchronize: false,
 });

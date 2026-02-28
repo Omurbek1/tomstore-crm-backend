@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { BonusEntity } from '../database/entities/bonus.entity';
 import { BonusesService } from './bonuses.service';
 
@@ -7,8 +7,13 @@ export class BonusesController {
   constructor(private readonly bonusesService: BonusesService) {}
 
   @Get()
-  findAll() {
-    return this.bonusesService.findAll();
+  findAll(
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.bonusesService.findAll(limit, offset);
   }
 
   @Post()

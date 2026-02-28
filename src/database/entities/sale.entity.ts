@@ -41,11 +41,26 @@ export class SaleEntity {
   @Column({ type: 'double precision', default: 0 })
   total: number;
 
+  @Column({ type: 'double precision', nullable: true })
+  discount?: number;
+
   @Column({ default: 'Центральный' })
   branch: string;
 
   @Column({ type: 'varchar', default: 'cash' })
-  paymentType: 'cash' | 'installment' | 'hybrid' | 'booking';
+  paymentType: 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual';
+
+  @Column({ type: 'varchar', nullable: true })
+  paymentLabel?: string;
+
+  @Column({ type: 'double precision', nullable: true })
+  hybridCash?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  hybridCard?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  hybridTransfer?: number;
 
   @Column({ type: 'int', nullable: true })
   installmentMonths?: number;
@@ -82,6 +97,9 @@ export class SaleEntity {
 
   @Column({ type: 'double precision', nullable: true })
   bookingDeposit?: number | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  bookingBuyout?: number | null;
 
   @Column({ type: 'timestamptz', nullable: true })
   manualDate?: Date | null;

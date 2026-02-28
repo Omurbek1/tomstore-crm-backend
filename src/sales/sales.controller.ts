@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { SaleEntity } from '../database/entities/sale.entity';
 import { SalesService } from './sales.service';
 
@@ -7,8 +7,13 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Get()
-  findAll() {
-    return this.salesService.findAll();
+  findAll(
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.salesService.findAll(limit, offset);
   }
 
   @Post()

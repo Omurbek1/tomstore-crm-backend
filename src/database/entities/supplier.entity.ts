@@ -17,6 +17,9 @@ export class SupplierEntity {
   @Column({ nullable: true })
   contacts?: string;
 
+  @Column({ nullable: true })
+  address?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

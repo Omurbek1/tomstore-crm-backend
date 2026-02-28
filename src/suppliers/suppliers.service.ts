@@ -10,14 +10,21 @@ export class SuppliersService {
     private readonly suppliersRepo: Repository<SupplierEntity>,
   ) {}
 
-  findAll() {
-    return this.suppliersRepo.find({ order: { createdAt: 'DESC' } });
+  findAll(limit?: number, offset?: number) {
+    const take = Math.max(1, Math.min(500, Number(limit ?? 200)));
+    const skip = Math.max(0, Number(offset ?? 0));
+    return this.suppliersRepo.find({
+      order: { createdAt: 'DESC' },
+      take,
+      skip,
+    });
   }
 
   create(payload: Partial<SupplierEntity>) {
     const supplier = this.suppliersRepo.create({
       name: payload.name ?? '',
       contacts: payload.contacts,
+      address: payload.address,
     });
     return this.suppliersRepo.save(supplier);
   }

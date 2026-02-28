@@ -23,8 +23,23 @@ export class BonusTargetEntity {
   @Column({ type: 'double precision', default: 0 })
   reward: number;
 
+  @Column({ type: 'varchar', default: 'money' })
+  rewardType: 'money' | 'material';
+
+  @Column({ type: 'varchar', nullable: true })
+  rewardText?: string | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   deadline?: Date;
+
+  @Column({ type: 'boolean', default: false })
+  rewardIssued: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  rewardIssuedAt?: Date | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  rewardApprovedBy?: string | null;
 
   @CreateDateColumn()
   createdAt: Date;

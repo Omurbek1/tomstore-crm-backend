@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { UserEntity } from '../database/entities/user.entity';
 import { UsersService } from './users.service';
 
@@ -6,9 +6,29 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Get('deleted')
+  findDeleted(
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.usersService.findDeleted(limit, offset);
+  }
+
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(
+    @Query('limit') limitRaw?: string,
+    @Query('offset') offsetRaw?: string,
+  ) {
+    const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
+    const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
+    return this.usersService.findAll(limit, offset);
+  }
+
+  @Get(':id/payout-balance')
+  getPayoutBalance(@Param('id') id: string) {
+    return this.usersService.getPayoutBalance(id);
   }
 
   @Patch(':id')
@@ -19,5 +39,10 @@ export class UsersController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.usersService.remove(id);
+  }
+
+  @Patch(':id/restore')
+  restore(@Param('id') id: string) {
+    return this.usersService.restore(id);
   }
 }

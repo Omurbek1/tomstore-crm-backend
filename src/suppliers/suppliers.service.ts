@@ -21,10 +21,20 @@ export class SuppliersService {
   }
 
   create(payload: Partial<SupplierEntity>) {
+    const imageUrls = Array.isArray(payload.imageUrls)
+      ? payload.imageUrls
+          .map((value) => String(value || '').trim())
+          .filter(Boolean)
+      : payload.imageUrl
+        ? [payload.imageUrl]
+        : [];
     const supplier = this.suppliersRepo.create({
       name: payload.name ?? '',
       contacts: payload.contacts,
       address: payload.address,
+      imageUrl: imageUrls[0] ?? payload.imageUrl,
+      imageUrls,
+      videoUrl: payload.videoUrl,
     });
     return this.suppliersRepo.save(supplier);
   }
@@ -35,7 +45,17 @@ export class SuppliersService {
       throw new NotFoundException('Поставщик не найден');
     }
 
-    await this.suppliersRepo.update(id, payload);
+    const patch = { ...payload };
+    if (Array.isArray(payload.imageUrls)) {
+      patch.imageUrls = payload.imageUrls
+        .map((value) => String(value || '').trim())
+        .filter(Boolean);
+      patch.imageUrl = patch.imageUrls[0];
+    } else if (payload.imageUrl && !payload.imageUrls) {
+      patch.imageUrls = [payload.imageUrl];
+    }
+
+    await this.suppliersRepo.update(id, patch);
     return this.suppliersRepo.findOneByOrFail({ id });
   }
 

@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { InventoryMovementEntity } from '../database/entities/inventory-movement.entity';
 import { AppSettingEntity } from '../database/entities/app-setting.entity';
 import { CashShiftEntity } from '../database/entities/cash-shift.entity';
+import { ClientEntity } from '../database/entities/client.entity';
+import { ClientLoyaltyTransactionEntity } from '../database/entities/client-loyalty-transaction.entity';
+import { ClientPromotionEntity } from '../database/entities/client-promotion.entity';
 import { ProductEntity } from '../database/entities/product.entity';
 import { SaleEntity } from '../database/entities/sale.entity';
 import { UserEntity } from '../database/entities/user.entity';
@@ -31,6 +34,11 @@ type SalesFindParams = {
 
 @Injectable()
 export class SalesService {
+  private saleCommentColumnEnsured = false;
+  private saleDeliveryPayerColumnEnsured = false;
+  private saleClientColumnsEnsured = false;
+  private saleCashbackColumnsEnsured = false;
+
   constructor(
     @InjectRepository(SaleEntity)
     private readonly salesRepo: Repository<SaleEntity>,
@@ -38,11 +46,55 @@ export class SalesService {
     private readonly productsRepo: Repository<ProductEntity>,
     @InjectRepository(UserEntity)
     private readonly usersRepo: Repository<UserEntity>,
+    @InjectRepository(ClientEntity)
+    private readonly clientsRepo: Repository<ClientEntity>,
+    @InjectRepository(ClientLoyaltyTransactionEntity)
+    private readonly loyaltyRepo: Repository<ClientLoyaltyTransactionEntity>,
+    @InjectRepository(ClientPromotionEntity)
+    private readonly promotionsRepo: Repository<ClientPromotionEntity>,
     @InjectRepository(CashShiftEntity)
     private readonly shiftsRepo: Repository<CashShiftEntity>,
     @InjectRepository(AppSettingEntity)
     private readonly settingsRepo: Repository<AppSettingEntity>,
   ) {}
+
+  private async ensureSaleCommentColumn() {
+    if (this.saleCommentColumnEnsured) return;
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "comment" text`,
+    );
+    this.saleCommentColumnEnsured = true;
+  }
+
+  private async ensureSaleDeliveryPayerColumn() {
+    if (this.saleDeliveryPayerColumnEnsured) return;
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "deliveryPaidByCompany" boolean`,
+    );
+    this.saleDeliveryPayerColumnEnsured = true;
+  }
+
+  private async ensureSaleClientColumns() {
+    if (this.saleClientColumnsEnsured) return;
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "clientId" character varying`,
+    );
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "loyaltyDiscountPercent" double precision`,
+    );
+    this.saleClientColumnsEnsured = true;
+  }
+
+  private async ensureSaleCashbackColumns() {
+    if (this.saleCashbackColumnsEnsured) return;
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "cashbackUsed" double precision`,
+    );
+    await this.salesRepo.query(
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "cashbackAccrued" double precision`,
+    );
+    this.saleCashbackColumnsEnsured = true;
+  }
 
   private async ensureManualPaymentTypesColumn() {
     await this.settingsRepo.query(
@@ -67,7 +119,11 @@ export class SalesService {
     return Array.from(new Set(values));
   }
 
-  findAll(params?: SalesFindParams) {
+  async findAll(params?: SalesFindParams) {
+    await this.ensureSaleCommentColumn();
+    await this.ensureSaleDeliveryPayerColumn();
+    await this.ensureSaleClientColumns();
+    await this.ensureSaleCashbackColumns();
     const take = Math.max(1, Math.min(500, Number(params?.limit ?? 200)));
     const skip = Math.max(0, Number(params?.offset ?? 0));
     const qb = this.salesRepo
@@ -93,7 +149,7 @@ export class SalesService {
     if (params?.q?.trim()) {
       const q = `%${params.q.trim().toLowerCase()}%`;
       qb.andWhere(
-        '(LOWER(sale.productName) LIKE :q OR LOWER(COALESCE(sale.clientName, \'\')) LIKE :q)',
+        '(LOWER(sale.productName) LIKE :q OR LOWER(COALESCE(sale.clientName, \'\')) LIKE :q OR LOWER(COALESCE(sale.comment, \'\')) LIKE :q)',
         { q },
       );
     }
@@ -117,6 +173,10 @@ export class SalesService {
   }
 
   async create(payload: Partial<SaleEntity>) {
+    await this.ensureSaleCommentColumn();
+    await this.ensureSaleDeliveryPayerColumn();
+    await this.ensureSaleClientColumns();
+    await this.ensureSaleCashbackColumns();
     const product = payload.productId
       ? await this.productsRepo.findOne({ where: { id: payload.productId } })
       : null;
@@ -132,10 +192,85 @@ export class SalesService {
 
     const quantity = Number(payload.quantity ?? 1);
     const price = Number(payload.price ?? product?.sellingPrice ?? 0);
-    const discount = Math.max(0, Number(payload.discount ?? 0));
-    const resolvedTotal = Number(
-      payload.total ?? Math.max(0, price * quantity - discount),
+    const requestedDiscount = Math.max(0, Number(payload.discount ?? 0));
+    const subtotal = Math.max(0, price * quantity);
+
+    const normalizeDigits = (value?: string | null) =>
+      String(value || '').replace(/\D/g, '');
+    const normalizedPhone = normalizeDigits(payload.clientPhone);
+    let matchedClient: ClientEntity | null = null;
+    if (payload.clientId) {
+      matchedClient = await this.clientsRepo.findOne({
+        where: { id: payload.clientId, isActive: true },
+      });
+    }
+    if (!matchedClient && normalizedPhone) {
+      const clients = await this.clientsRepo.find({ where: { isActive: true }, take: 600 });
+      matchedClient =
+        clients.find((c) => normalizeDigits(c.phone) === normalizedPhone) || null;
+    }
+
+    const saleDate = payload.manualDate ? new Date(payload.manualDate) : new Date();
+    const baseClientDiscountPercent = Math.max(
+      0,
+      Number(matchedClient?.discountPercent || 0),
     );
+    let birthdayDiscountPercent = 0;
+    if (matchedClient?.birthDate) {
+      const birthDate = new Date(matchedClient.birthDate);
+      if (
+        !Number.isNaN(saleDate.getTime()) &&
+        !Number.isNaN(birthDate.getTime()) &&
+        saleDate.getUTCMonth() === birthDate.getUTCMonth() &&
+        saleDate.getUTCDate() === birthDate.getUTCDate()
+      ) {
+        birthdayDiscountPercent = Math.max(
+          0,
+          Number(matchedClient.birthdayDiscountPercent || 0),
+        );
+      }
+    }
+    const activePromotions = matchedClient
+      ? await this.promotionsRepo.find({
+          where: [{ clientId: matchedClient.id }, { clientId: null as unknown as string }],
+          order: { createdAt: 'DESC' },
+          take: 100,
+        })
+      : [];
+    const promoDiscountPercent = activePromotions
+      .filter((promo) => {
+        if (!promo.isActive) return false;
+        const startsAt = promo.startsAt ? new Date(promo.startsAt) : null;
+        const endsAt = promo.endsAt ? new Date(promo.endsAt) : null;
+        if (startsAt && saleDate < startsAt) return false;
+        if (endsAt && saleDate > endsAt) return false;
+        return true;
+      })
+      .reduce((max, promo) => Math.max(max, Number(promo.discountPercent || 0)), 0);
+    const loyaltyDiscountPercent = Math.min(
+      100,
+      baseClientDiscountPercent + birthdayDiscountPercent + promoDiscountPercent,
+    );
+    const loyaltyDiscountAmount = Math.round(
+      ((subtotal * loyaltyDiscountPercent) / 100) * 100,
+    ) / 100;
+    const discount = Math.max(requestedDiscount, loyaltyDiscountAmount);
+    const discountDelta = Math.max(0, discount - requestedDiscount);
+    const incomingTotal = Number(payload.total ?? Math.max(0, subtotal - requestedDiscount));
+    const totalBeforeCashback = Math.max(0, incomingTotal - discountDelta);
+    const cashbackToUseRequested = Math.max(
+      0,
+      Number((payload as Partial<SaleEntity> & { cashbackToUse?: number }).cashbackToUse || 0),
+    );
+    const cashbackToUse = matchedClient
+      ? Math.min(
+          cashbackToUseRequested,
+          matchedClient.bonusesBlocked ? 0 : Number(matchedClient.cashbackBalance || 0),
+          totalBeforeCashback,
+        )
+      : 0;
+    const resolvedTotal = Math.max(0, totalBeforeCashback - cashbackToUse);
+    const baseTotal = Math.max(0, subtotal - discount);
     const hybridCash = Math.max(0, Number(payload.hybridCash ?? 0));
     const hybridCard = Math.max(0, Number(payload.hybridCard ?? 0));
     const hybridTransfer = Math.max(0, Number(payload.hybridTransfer ?? 0));
@@ -296,6 +431,8 @@ export class SalesService {
         clientName: payload.clientName ?? '',
         clientPhone: payload.clientPhone,
         clientAddress: payload.clientAddress,
+        comment: payload.comment ? String(payload.comment).trim() : undefined,
+        clientId: payload.clientId ?? matchedClient?.id ?? undefined,
         productId: payload.productId ?? '',
         productName: payload.productName ?? currentProduct?.name ?? '',
         supplierSnapshot: payload.supplierSnapshot ?? currentProduct?.supplier,
@@ -304,6 +441,9 @@ export class SalesService {
         quantity,
         total: resolvedTotal,
         discount,
+        loyaltyDiscountPercent,
+        cashbackUsed: cashbackToUse > 0 ? cashbackToUse : undefined,
+        cashbackAccrued: 0,
         branch: payload.branch ?? currentProduct?.branchName ?? 'Центральный',
         shiftId,
         paymentType: payload.paymentType ?? 'cash',
@@ -346,9 +486,140 @@ export class SalesService {
         updatedBy: payload.updatedBy,
         deliveryCost:
           payload.deliveryCost === undefined ? 0 : Number(payload.deliveryCost),
+        deliveryPaidByCompany:
+          payload.saleType === 'delivery'
+            ? payload.deliveryPaidByCompany === undefined
+              ? !(resolvedTotal > baseTotal + 0.01)
+              : Boolean(payload.deliveryPaidByCompany)
+            : false,
       });
 
       const savedSale = await trx.save(SaleEntity, sale);
+
+      if (matchedClient) {
+        const now = new Date();
+        const wasExpired =
+          matchedClient.cashbackExpiresAt &&
+          new Date(matchedClient.cashbackExpiresAt).getTime() < now.getTime() &&
+          Number(matchedClient.cashbackBalance || 0) > 0;
+        let cashbackBalance = wasExpired ? 0 : Number(matchedClient.cashbackBalance || 0);
+        if (wasExpired) {
+          await trx.save(
+            ClientLoyaltyTransactionEntity,
+            trx.create(ClientLoyaltyTransactionEntity, {
+              clientId: matchedClient.id,
+              type: 'cashback_expire',
+              amount: Number(matchedClient.cashbackBalance || 0),
+              expiresAt: now,
+              note: 'Срок действия кэшбека истек',
+            }),
+          );
+        }
+
+        const cashbackSpend = Math.min(cashbackToUse, cashbackBalance, Number(savedSale.total || 0) + cashbackToUse);
+        cashbackBalance = Math.max(0, cashbackBalance - cashbackSpend);
+        if (cashbackSpend > 0) {
+          await trx.save(
+            ClientLoyaltyTransactionEntity,
+            trx.create(ClientLoyaltyTransactionEntity, {
+              clientId: matchedClient.id,
+              type: 'cashback_spend',
+              amount: cashbackSpend,
+              saleId: savedSale.id,
+              note: 'Списание кэшбека при продаже',
+            }),
+          );
+        }
+
+        const canAccrue = !matchedClient.bonusesBlocked;
+        const cashbackRatePercent = Math.max(0, Number(matchedClient.cashbackRatePercent || 0));
+        const cashbackAccrued = canAccrue
+          ? Math.round(((Number(savedSale.total || 0) * cashbackRatePercent) / 100) * 100) / 100
+          : 0;
+        if (cashbackAccrued > 0) {
+          cashbackBalance += cashbackAccrued;
+          await trx.save(
+            ClientLoyaltyTransactionEntity,
+            trx.create(ClientLoyaltyTransactionEntity, {
+              clientId: matchedClient.id,
+              type: 'cashback_accrual',
+              amount: cashbackAccrued,
+              saleId: savedSale.id,
+              note: 'Начисление кэшбека',
+              expiresAt: new Date(
+                now.getTime() +
+                  Math.max(1, Number(matchedClient.cashbackExpiryDays || 180)) *
+                    24 *
+                    60 *
+                    60 *
+                    1000,
+              ),
+            }),
+          );
+        }
+
+        const totalSpent = Math.max(0, Number(matchedClient.totalSpent || 0) + Number(savedSale.total || 0));
+        const level: ClientEntity['level'] =
+          totalSpent >= 1200000 ? 'vip' : totalSpent >= 400000 ? 'gold' : 'silver';
+        const cashbackExpiresAt =
+          cashbackAccrued > 0
+            ? new Date(
+                now.getTime() +
+                  Math.max(1, Number(matchedClient.cashbackExpiryDays || 180)) *
+                    24 *
+                    60 *
+                    60 *
+                    1000,
+              )
+            : wasExpired
+              ? null
+              : matchedClient.cashbackExpiresAt || null;
+
+        await trx.update(ClientEntity, matchedClient.id, {
+          cashbackBalance,
+          cashbackExpiresAt,
+          totalSpent,
+          level,
+        });
+
+        if (cashbackAccrued > 0) {
+          await trx.update(SaleEntity, savedSale.id, { cashbackAccrued });
+          savedSale.cashbackAccrued = cashbackAccrued;
+        }
+
+        const referrerId = matchedClient.referredByClientId
+          ? String(matchedClient.referredByClientId).trim()
+          : '';
+        if (referrerId) {
+          const referrer = await trx.findOne(ClientEntity, { where: { id: referrerId, isActive: true } });
+          if (referrer && !referrer.bonusesBlocked) {
+            const referralBonus = Math.round(cashbackAccrued * 0.1 * 100) / 100;
+            if (referralBonus > 0) {
+              await trx.update(ClientEntity, referrer.id, {
+                cashbackBalance: Math.max(0, Number(referrer.cashbackBalance || 0) + referralBonus),
+                cashbackExpiresAt: new Date(
+                  now.getTime() +
+                    Math.max(1, Number(referrer.cashbackExpiryDays || 180)) *
+                      24 *
+                      60 *
+                      60 *
+                      1000,
+                ),
+              });
+              await trx.save(
+                ClientLoyaltyTransactionEntity,
+                trx.create(ClientLoyaltyTransactionEntity, {
+                  clientId: referrer.id,
+                  type: 'referral_bonus',
+                  amount: referralBonus,
+                  saleId: savedSale.id,
+                  note: `Реферальный бонус за клиента ${matchedClient.fullName}`,
+                }),
+              );
+            }
+          }
+        }
+      }
 
       if (savedSale.paymentType === 'hybrid') {
         const hybridTotal =
@@ -389,6 +660,10 @@ export class SalesService {
   }
 
   async update(id: string, payload: Partial<SaleEntity>) {
+    await this.ensureSaleCommentColumn();
+    await this.ensureSaleDeliveryPayerColumn();
+    await this.ensureSaleClientColumns();
+    await this.ensureSaleCashbackColumns();
     const found = await this.salesRepo.findOne({ where: { id } });
     if (!found) {
       throw new NotFoundException('Продажа не найдена');

@@ -15,6 +15,10 @@ import { TrainingMaterialEntity } from './database/entities/training-material.en
 import { SaleEntity } from './database/entities/sale.entity';
 import { SupplierEntity } from './database/entities/supplier.entity';
 import { UserEntity } from './database/entities/user.entity';
+import { ClientEntity } from './database/entities/client.entity';
+import { ClientLoyaltyTransactionEntity } from './database/entities/client-loyalty-transaction.entity';
+import { ClientPromotionEntity } from './database/entities/client-promotion.entity';
+import { ClientSmsLogEntity } from './database/entities/client-sms-log.entity';
 import { InventoryMovementEntity } from './database/entities/inventory-movement.entity';
 import { RepairTicketEntity } from './database/entities/repair-ticket.entity';
 import { RepairEventEntity } from './database/entities/repair-event.entity';
@@ -70,8 +74,17 @@ import { AddMarketingKpi1730000000031 } from './database/migrations/173000000003
 import { AddMarketingKpiPlanModeAndItems1730000000032 } from './database/migrations/1730000000032-AddMarketingKpiPlanModeAndItems';
 import { AddTargetStartDate1730000000033 } from './database/migrations/1730000000033-AddTargetStartDate';
 import { AddAiMemory1730000000034 } from './database/migrations/1730000000034-AddAiMemory';
+import { AddSaleComment1730000000035 } from './database/migrations/1730000000035-AddSaleComment';
+import { AddSaleDeliveryPayer1730000000036 } from './database/migrations/1730000000036-AddSaleDeliveryPayer';
+import { AddClients1730000000037 } from './database/migrations/1730000000037-AddClients';
+import { AddClientLoyalty1730000000038 } from './database/migrations/1730000000038-AddClientLoyalty';
+import { AddTaskAttachments1730000000039 } from './database/migrations/1730000000039-AddTaskAttachments';
+import { AddSupplierMediaLinks1730000000040 } from './database/migrations/1730000000040-AddSupplierMediaLinks';
+import { AddSupplierImageUrls1730000000041 } from './database/migrations/1730000000041-AddSupplierImageUrls';
+import { AddUserManagedBranches1730000000042 } from './database/migrations/1730000000042-AddUserManagedBranches';
 import { MarketingKpiModule } from './marketing-kpi/marketing-kpi.module';
 import { AiModule } from './ai/ai.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
@@ -102,6 +115,10 @@ import { AiModule } from './ai/ai.module';
         TaskEntity,
         MarketingKpiEntity,
         AiMemoryEntity,
+        ClientEntity,
+        ClientLoyaltyTransactionEntity,
+        ClientPromotionEntity,
+        ClientSmsLogEntity,
       ],
       migrations: [
         InitSchema1730000000000,
@@ -139,6 +156,14 @@ import { AiModule } from './ai/ai.module';
         AddMarketingKpiPlanModeAndItems1730000000032,
         AddTargetStartDate1730000000033,
         AddAiMemory1730000000034,
+        AddSaleComment1730000000035,
+        AddSaleDeliveryPayer1730000000036,
+        AddClients1730000000037,
+        AddClientLoyalty1730000000038,
+        AddTaskAttachments1730000000039,
+        AddSupplierMediaLinks1730000000040,
+        AddSupplierImageUrls1730000000041,
+        AddUserManagedBranches1730000000042,
       ],
       migrationsRun: true,
       migrationsTableName: 'migrations',
@@ -162,6 +187,7 @@ import { AiModule } from './ai/ai.module';
     TasksModule,
     MarketingKpiModule,
     AiModule,
+    ClientsModule,
   ],
 })
 export class AppModule {}

@@ -4,6 +4,7 @@ import {
   AnalyzePayload,
   MarketingPlanDraftPayload,
   MaterialsHelpPayload,
+  OrderDraftPayload,
   TasksDraftPayload,
 } from './ai.service';
 
@@ -29,5 +30,10 @@ export class AiController {
   @Post('materials-help')
   materialsHelp(@Body() payload: MaterialsHelpPayload) {
     return this.aiService.materialsHelp(payload);
+  }
+
+  @Post('order-draft')
+  orderDraft(@Body() payload: OrderDraftPayload) {
+    return this.aiService.orderDraft(payload);
   }
 }

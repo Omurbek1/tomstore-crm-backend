@@ -59,6 +59,12 @@ export class UserEntity {
   @Column({ type: 'varchar', nullable: true })
   branchName?: string;
 
+  @Column({ type: 'simple-array', nullable: true })
+  managedBranchIds?: string[];
+
+  @Column({ type: 'simple-array', nullable: true })
+  managedBranchNames?: string[];
+
   @Column({ type: 'boolean', default: false })
   deleted: boolean;
 

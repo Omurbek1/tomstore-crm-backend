@@ -1,0 +1,18 @@
+﻿date,productName,managerName,clientName,quantity,total,branch,paymentType
+28.02.2026 16:44,epson 3258,kassa,Розничный клиент,1,14900,vesna3,transfer
+28.02.2026 16:41,epson 3258,kassa,Розничный клиент,1,14900,vesna3,cash
+28.02.2026 16:33,epson 3258,kassa,Розничный клиент,3,44700,vesna3,cash
+28.02.2026 16:31,epson 3258,kassa,Розничный клиент,1,14900,vesna3,cash
+28.02.2026 16:01,Printer HP 107a,kassa,Розничный клиент,1,15000,vesna3,cash
+28.02.2026 15:59,Printer HP 107a,kassa,Розничный клиент,1,15000,vesna3,cash
+28.02.2026 15:40,Printer HP 107a,kassa,Розничный клиент,1,15000,vesna3,cash
+28.02.2026 15:40,iPhone 15,kassa,Розничный клиент,1,85000,vesna3,cash
+28.02.2026 15:35,iPhone 15,kassa,Розничный клиент,3,255000,vesna3,cash
+28.02.2026 15:35,Printer HP 107a,kassa,Розничный клиент,2,30000,vesna3,cash
+28.02.2026 15:35,Printer HP 107a,kassa,Розничный клиент,1,15000,vesna3,cash
+28.02.2026 15:35,iPhone 15,kassa,Розничный клиент,1,85000,vesna3,cash
+28.02.2026 15:31,iPhone 15,kassa,Розничный клиент,1,85000,vesna3,cash
+28.02.2026 15:30,iPhone 15,kassa,Розничный клиент,3,255000,vesna3,cash
+28.02.2026 15:25,iPhone 15,kassa,Розничный клиент,1,85000,vesna3,cash
+28.02.2026 15:16,Printer HP 107a,kassa,Розничный клиент,1,15000,vesna3,cash
+28.02.2026 14:22,Printer HP 107a,omur,ыы,1,15000,vesna3,cash

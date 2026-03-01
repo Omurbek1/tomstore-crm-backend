@@ -43,6 +43,15 @@ export type MaterialsHelpPayload = {
   }>;
 };
 
+export type OrderDraftPayload = {
+  text: string;
+  locale?: string;
+  branches?: string[];
+  products?: Array<{ id?: string; name?: string; price?: number }>;
+  managers?: Array<{ id?: string; name?: string; role?: string }>;
+  manualPaymentTypes?: string[];
+};
+
 type AnalyzeResult = {
   source: 'llm' | 'rule-based';
   summary: string;
@@ -96,6 +105,29 @@ type MaterialsHelpResult = {
     reason?: string;
     url?: string;
   }>;
+};
+
+type OrderDraftResult = {
+  source: 'llm';
+  draft: {
+    clientName?: string;
+    clientPhone?: string;
+    clientAddress?: string;
+    branchName?: string;
+    productName?: string;
+    quantity?: number;
+    price?: number;
+    saleType?: 'office' | 'delivery';
+    paymentType?: 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual';
+    paymentLabel?: string;
+    installmentMonths?: number;
+    deliveryCost?: number;
+    clientPaysDelivery?: boolean;
+    bookingDeposit?: number;
+    bookingBuyout?: number;
+    managerName?: string;
+    comment?: string;
+  };
 };
 
 @Injectable()
@@ -597,6 +629,178 @@ ${JSON.stringify(materials)}`;
     return result;
   }
 
+  async orderDraft(payload: OrderDraftPayload): Promise<OrderDraftResult> {
+    const text = String(payload?.text || '').trim();
+    if (!text) {
+      throw new ServiceUnavailableException('Текст заказа пустой');
+    }
+    if (!process.env.AI_API_KEY || process.env.AI_PROVIDER === 'disabled') {
+      throw new ServiceUnavailableException(
+        'ИИ не настроен: укажите AI_API_KEY на сервере',
+      );
+    }
+
+    const providerUrl =
+      process.env.AI_BASE_URL?.trim() || 'https://api.openai.com/v1';
+    const model = process.env.AI_MODEL?.trim() || 'gpt-4.1-mini';
+    const apiKey = process.env.AI_API_KEY?.trim();
+    if (!apiKey) {
+      throw new ServiceUnavailableException(
+        'ИИ не настроен: укажите AI_API_KEY на сервере',
+      );
+    }
+
+    const branches = Array.isArray(payload?.branches) ? payload.branches.slice(0, 120) : [];
+    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 300) : [];
+    const managers = Array.isArray(payload?.managers) ? payload.managers.slice(0, 120) : [];
+    const manualPaymentTypes = Array.isArray(payload?.manualPaymentTypes)
+      ? payload.manualPaymentTypes.slice(0, 40)
+      : [];
+
+    const memoryContext = await this.getMemoryContext({
+      domain: 'sales-order',
+      audience: 'sales',
+      queryText: text,
+    });
+
+    const systemPrompt =
+      'Ты senior sales operator. Преобразуй свободный текст в черновик заказа CRM. Верни только JSON.';
+    const userPrompt = `Сформируй JSON:
+{
+  "clientName": "имя клиента или пусто",
+  "clientPhone": "телефон или пусто",
+  "clientAddress": "адрес или пусто",
+  "branchName": "точное имя филиала из списка или пусто",
+  "productName": "точное имя товара из списка или пусто",
+  "quantity": 1,
+  "price": 0,
+  "saleType": "office|delivery",
+  "paymentType": "cash|installment|hybrid|booking|manual",
+  "paymentLabel": "канал оплаты или провайдер рассрочки",
+  "installmentMonths": 0,
+  "deliveryCost": 0,
+  "clientPaysDelivery": false,
+  "bookingDeposit": 0,
+  "bookingBuyout": 0,
+  "managerName": "имя менеджера из списка или пусто",
+  "comment": "краткий комментарий"
+}
+Правила:
+- Только JSON, без пояснений.
+- quantity >= 1.
+- Если есть доставка клиентом, clientPaysDelivery=true.
+- saleType=delivery только когда явно есть доставка/адрес.
+- paymentType=manual только если paymentLabel из manualPaymentTypes.
+- Если не уверен, оставляй поле пустым/0.
+Доступные филиалы:
+${JSON.stringify(branches)}
+Доступные товары:
+${JSON.stringify(products)}
+Доступные менеджеры:
+${JSON.stringify(managers)}
+Доступные ручные типы оплаты:
+${JSON.stringify(manualPaymentTypes)}
+Текст заказа:
+${text}
+Похожие кейсы:
+${memoryContext || 'нет'}`;
+
+    const res = await fetch(`${providerUrl.replace(/\/+$/, '')}/responses`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new ServiceUnavailableException('ИИ временно недоступен, попробуйте позже');
+    }
+
+    const data = (await res.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+    };
+    const textOut =
+      data.output_text ||
+      data.output?.flatMap((x) => x.content || []).find((c) => c.type === 'output_text')
+        ?.text ||
+      '';
+    const parsed = this.safeParseOrderDraftJson(textOut);
+    if (!parsed) {
+      throw new ServiceUnavailableException(
+        'ИИ вернул некорректный формат черновика заказа, уточните текст',
+      );
+    }
+
+    const normalizeNameFromList = (value: string | undefined, list: string[]) => {
+      const raw = String(value || '').trim();
+      if (!raw) return undefined;
+      const exact = list.find((x) => x.toLowerCase() === raw.toLowerCase());
+      return exact || raw;
+    };
+
+    const normalizedPaymentType = this.normalizePaymentType(parsed.paymentType);
+    const paymentLabel = String(parsed.paymentLabel || '').trim() || undefined;
+    const manualAllowed =
+      normalizedPaymentType !== 'manual' ||
+      (paymentLabel &&
+        manualPaymentTypes.some((x) => x.toLowerCase() === paymentLabel.toLowerCase()));
+
+    const result: OrderDraftResult = {
+      source: 'llm',
+      draft: {
+        clientName: String(parsed.clientName || '').trim() || undefined,
+        clientPhone: String(parsed.clientPhone || '').trim() || undefined,
+        clientAddress: String(parsed.clientAddress || '').trim() || undefined,
+        branchName: normalizeNameFromList(parsed.branchName, branches),
+        productName: normalizeNameFromList(
+          parsed.productName,
+          products.map((p) => String(p.name || '')).filter(Boolean),
+        ),
+        quantity: Math.max(1, this.toSafeInt(parsed.quantity || 1)),
+        price: this.toSafeInt(parsed.price || 0),
+        saleType: parsed.saleType === 'delivery' ? 'delivery' : 'office',
+        paymentType:
+          normalizedPaymentType === 'manual' && !manualAllowed
+            ? 'cash'
+            : normalizedPaymentType,
+        paymentLabel:
+          normalizedPaymentType === 'manual' && !manualAllowed
+            ? undefined
+            : paymentLabel,
+        installmentMonths: this.toSafeInt(parsed.installmentMonths || 0),
+        deliveryCost: this.toSafeInt(parsed.deliveryCost || 0),
+        clientPaysDelivery: Boolean(parsed.clientPaysDelivery),
+        bookingDeposit: this.toSafeInt(parsed.bookingDeposit || 0),
+        bookingBuyout: this.toSafeInt(parsed.bookingBuyout || 0),
+        managerName: normalizeNameFromList(
+          parsed.managerName,
+          managers.map((m) => String(m.name || '')).filter(Boolean),
+        ),
+        comment: String(parsed.comment || '').trim() || undefined,
+      },
+    };
+
+    await this.saveMemory({
+      domain: 'sales-order',
+      audience: 'sales',
+      question: text,
+      answer: JSON.stringify(result),
+      metadata: { type: 'order-draft' },
+    });
+
+    return result;
+  }
+
   private safeParseTasksJson(text: string): {
     tasks: Array<{
       title?: string;
@@ -758,6 +962,70 @@ ${JSON.stringify(materials)}`;
     } catch {
       return null;
     }
+  }
+
+  private safeParseOrderDraftJson(text: string): {
+    clientName?: string;
+    clientPhone?: string;
+    clientAddress?: string;
+    branchName?: string;
+    productName?: string;
+    quantity?: number;
+    price?: number;
+    saleType?: 'office' | 'delivery';
+    paymentType?: 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual';
+    paymentLabel?: string;
+    installmentMonths?: number;
+    deliveryCost?: number;
+    clientPaysDelivery?: boolean;
+    bookingDeposit?: number;
+    bookingBuyout?: number;
+    managerName?: string;
+    comment?: string;
+  } | null {
+    const raw = String(text || '').trim();
+    if (!raw) return null;
+    const start = raw.indexOf('{');
+    const end = raw.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(raw.slice(start, end + 1)) as {
+        clientName?: string;
+        clientPhone?: string;
+        clientAddress?: string;
+        branchName?: string;
+        productName?: string;
+        quantity?: number;
+        price?: number;
+        saleType?: 'office' | 'delivery';
+        paymentType?: 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual';
+        paymentLabel?: string;
+        installmentMonths?: number;
+        deliveryCost?: number;
+        clientPaysDelivery?: boolean;
+        bookingDeposit?: number;
+        bookingBuyout?: number;
+        managerName?: string;
+        comment?: string;
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizePaymentType(
+    value?: string,
+  ): 'cash' | 'installment' | 'hybrid' | 'booking' | 'manual' {
+    if (
+      value === 'cash' ||
+      value === 'installment' ||
+      value === 'hybrid' ||
+      value === 'booking' ||
+      value === 'manual'
+    ) {
+      return value;
+    }
+    return 'cash';
   }
 
   private async createEmbedding(input: string): Promise<number[] | null> {

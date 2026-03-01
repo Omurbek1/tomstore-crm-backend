@@ -20,6 +20,12 @@ export class SaleEntity {
   @Column({ nullable: true })
   clientAddress?: string;
 
+  @Column({ type: 'text', nullable: true })
+  comment?: string;
+
+  @Column({ nullable: true })
+  clientId?: string;
+
   @Column()
   productId: string;
 
@@ -43,6 +49,9 @@ export class SaleEntity {
 
   @Column({ type: 'double precision', nullable: true })
   discount?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  loyaltyDiscountPercent?: number;
 
   @Column({ default: 'Центральный' })
   branch: string;
@@ -112,6 +121,15 @@ export class SaleEntity {
 
   @Column({ type: 'double precision', nullable: true })
   deliveryCost?: number;
+
+  @Column({ type: 'boolean', nullable: true })
+  deliveryPaidByCompany?: boolean;
+
+  @Column({ type: 'double precision', nullable: true })
+  cashbackUsed?: number;
+
+  @Column({ type: 'double precision', nullable: true })
+  cashbackAccrued?: number;
 
   @CreateDateColumn()
   createdAt: Date;

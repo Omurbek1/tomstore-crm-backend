@@ -20,6 +20,10 @@ import { CashShiftEntity } from './entities/cash-shift.entity';
 import { TaskEntity } from './entities/task.entity';
 import { MarketingKpiEntity } from './entities/marketing-kpi.entity';
 import { AiMemoryEntity } from './entities/ai-memory.entity';
+import { ClientEntity } from './entities/client.entity';
+import { ClientLoyaltyTransactionEntity } from './entities/client-loyalty-transaction.entity';
+import { ClientPromotionEntity } from './entities/client-promotion.entity';
+import { ClientSmsLogEntity } from './entities/client-sms-log.entity';
 import { InitSchema1730000000000 } from './migrations/1730000000000-InitSchema';
 import { AddProductManagerPercent1730000000001 } from './migrations/1730000000001-AddProductManagerPercent';
 import { AddProductMediaAndCharacteristics1730000000002 } from './migrations/1730000000002-AddProductMediaAndCharacteristics';
@@ -55,6 +59,14 @@ import { AddMarketingKpi1730000000031 } from './migrations/1730000000031-AddMark
 import { AddMarketingKpiPlanModeAndItems1730000000032 } from './migrations/1730000000032-AddMarketingKpiPlanModeAndItems';
 import { AddTargetStartDate1730000000033 } from './migrations/1730000000033-AddTargetStartDate';
 import { AddAiMemory1730000000034 } from './migrations/1730000000034-AddAiMemory';
+import { AddSaleComment1730000000035 } from './migrations/1730000000035-AddSaleComment';
+import { AddSaleDeliveryPayer1730000000036 } from './migrations/1730000000036-AddSaleDeliveryPayer';
+import { AddClients1730000000037 } from './migrations/1730000000037-AddClients';
+import { AddClientLoyalty1730000000038 } from './migrations/1730000000038-AddClientLoyalty';
+import { AddTaskAttachments1730000000039 } from './migrations/1730000000039-AddTaskAttachments';
+import { AddSupplierMediaLinks1730000000040 } from './migrations/1730000000040-AddSupplierMediaLinks';
+import { AddSupplierImageUrls1730000000041 } from './migrations/1730000000041-AddSupplierImageUrls';
+import { AddUserManagedBranches1730000000042 } from './migrations/1730000000042-AddUserManagedBranches';
 
 export default new DataSource({
   type: 'postgres',
@@ -83,6 +95,10 @@ export default new DataSource({
     TaskEntity,
     MarketingKpiEntity,
     AiMemoryEntity,
+    ClientEntity,
+    ClientLoyaltyTransactionEntity,
+    ClientPromotionEntity,
+    ClientSmsLogEntity,
   ],
   migrations: [
     InitSchema1730000000000,
@@ -120,6 +136,14 @@ export default new DataSource({
     AddMarketingKpiPlanModeAndItems1730000000032,
     AddTargetStartDate1730000000033,
     AddAiMemory1730000000034,
+    AddSaleComment1730000000035,
+    AddSaleDeliveryPayer1730000000036,
+    AddClients1730000000037,
+    AddClientLoyalty1730000000038,
+    AddTaskAttachments1730000000039,
+    AddSupplierMediaLinks1730000000040,
+    AddSupplierImageUrls1730000000041,
+    AddUserManagedBranches1730000000042,
   ],
   synchronize: false,
 });

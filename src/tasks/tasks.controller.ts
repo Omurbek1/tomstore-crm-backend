@@ -49,6 +49,7 @@ export class TasksController {
       priority?: TaskPriority;
       createdById?: string;
       createdByName?: string;
+      attachmentUrls?: string[];
     },
   ) {
     return this.tasksService.create(body);
@@ -67,6 +68,7 @@ export class TasksController {
       deadline?: string | null;
       priority?: TaskPriority;
       status?: TaskStatus;
+      attachmentUrls?: string[];
     },
   ) {
     return this.tasksService.update(id, body);

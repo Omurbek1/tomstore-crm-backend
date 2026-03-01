@@ -20,6 +20,15 @@ export class SupplierEntity {
   @Column({ nullable: true })
   address?: string;
 
+  @Column({ nullable: true })
+  imageUrl?: string;
+
+  @Column({ type: 'jsonb', default: () => "'[]'" })
+  imageUrls: string[];
+
+  @Column({ nullable: true })
+  videoUrl?: string;
+
   @CreateDateColumn()
   createdAt: Date;
 

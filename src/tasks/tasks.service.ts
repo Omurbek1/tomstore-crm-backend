@@ -71,6 +71,7 @@ export class TasksService {
     priority?: TaskPriority;
     createdById?: string;
     createdByName?: string;
+    attachmentUrls?: string[];
   }) {
     const title = String(payload.title || '').trim();
     if (!title) throw new BadRequestException('title обязателен');
@@ -103,6 +104,7 @@ export class TasksService {
       createdById: payload.createdById?.trim() || undefined,
       createdByName: payload.createdByName?.trim() || undefined,
       completedAt: null,
+      attachmentUrls: this.normalizeAttachmentUrls(payload.attachmentUrls),
     });
 
     return this.tasksRepo.save(task);
@@ -119,6 +121,7 @@ export class TasksService {
       deadline?: string | null;
       priority?: TaskPriority;
       status?: TaskStatus;
+      attachmentUrls?: string[];
     },
   ) {
     const task = await this.tasksRepo.findOne({ where: { id } });
@@ -169,6 +172,9 @@ export class TasksService {
       task.status = this.normalizeStatus(payload.status);
       task.completedAt = task.status === 'done' ? new Date() : null;
     }
+    if (payload.attachmentUrls !== undefined) {
+      task.attachmentUrls = this.normalizeAttachmentUrls(payload.attachmentUrls);
+    }
 
     return this.tasksRepo.save(task);
   }
@@ -197,5 +203,13 @@ export class TasksService {
       return value;
     }
     throw new BadRequestException('Некорректный статус задачи');
+  }
+
+  private normalizeAttachmentUrls(value?: string[]): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .slice(0, 20);
   }
 }

@@ -33,6 +33,7 @@ export class AuthService implements OnModuleInit {
         phone: '+996700000000',
         address: 'Бишкек',
         branchName: 'Центральный',
+        managedBranchNames: ['Центральный'],
         birthYear: 1988,
         birthDate: new Date('1988-01-01T00:00:00Z'),
         deleted: false,
@@ -130,6 +131,33 @@ export class AuthService implements OnModuleInit {
     >;
   }
 
+  private normalizeManagedBranches(
+    payload: Partial<UserEntity>,
+  ): Partial<UserEntity> {
+    const result: Partial<UserEntity> = {};
+
+    if (payload.managedBranchIds !== undefined) {
+      const ids = Array.isArray(payload.managedBranchIds)
+        ? payload.managedBranchIds
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        : [];
+      result.managedBranchIds = ids.length > 0 ? Array.from(new Set(ids)) : [];
+    }
+
+    if (payload.managedBranchNames !== undefined) {
+      const names = Array.isArray(payload.managedBranchNames)
+        ? payload.managedBranchNames
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        : [];
+      result.managedBranchNames =
+        names.length > 0 ? Array.from(new Set(names)) : [];
+    }
+
+    return result;
+  }
+
   async login(loginOrName: string, password: string) {
     if (!loginOrName) {
       throw new UnauthorizedException('Неверный логин или пароль');
@@ -167,6 +195,8 @@ export class AuthService implements OnModuleInit {
     const derivedBirthYear = birthDateValue ? birthDateValue.getUTCFullYear() : undefined;
 
     const normalizedRoles = this.normalizeRoles(payload.role, payload.roles);
+    const managedBranches = this.normalizeManagedBranches(payload);
+    const isSuperAdmin = normalizedRoles.includes('superadmin');
     const salaryType =
       payload.salaryType === 'fixed' || normalizedRoles.includes('cashier')
         ? 'fixed'
@@ -191,6 +221,12 @@ export class AuthService implements OnModuleInit {
       photoUrl: payload.photoUrl,
       branchId: payload.branchId,
       branchName: payload.branchName,
+      managedBranchIds: isSuperAdmin
+        ? managedBranches.managedBranchIds
+        : undefined,
+      managedBranchNames: isSuperAdmin
+        ? managedBranches.managedBranchNames
+        : undefined,
       deleted: false,
     });
 

@@ -186,6 +186,18 @@ export class MarketingKpiService {
     return `external:${normalized || Date.now()}`;
   }
 
+  private isKpiAccrualEligibleRole(role?: string | null) {
+    const normalized = String(role || '')
+      .trim()
+      .toLowerCase();
+    if (!normalized) return false;
+    return (
+      normalized !== 'manager' &&
+      normalized !== 'cashier' &&
+      normalized !== 'storekeeper'
+    );
+  }
+
   private normalizePeriod(mode: 'week' | 'month', startRaw?: unknown, endRaw?: unknown) {
     if (mode === 'month') {
       return { periodStart: null, periodEnd: null };
@@ -276,8 +288,10 @@ export class MarketingKpiService {
     else if (kpiScore < 70) adjustRate = -0.1;
     else if (kpiScore < 80) adjustRate = -0.05;
 
-    const salaryBonus = salaryBase * adjustRate;
-    const salaryTotal = salaryBase + salaryBonus;
+    const canAccrueSalary = this.isKpiAccrualEligibleRole(payload.managerRole);
+    const effectiveSalaryBase = canAccrueSalary ? salaryBase : 0;
+    const salaryBonus = effectiveSalaryBase * adjustRate;
+    const salaryTotal = effectiveSalaryBase + salaryBonus;
 
     return {
       plannedPosts,
@@ -289,7 +303,7 @@ export class MarketingKpiService {
       followersGrowth,
       erPercent: Number(erPercent.toFixed(2)),
       kpiScore: Number(kpiScore.toFixed(2)),
-      salaryBase,
+      salaryBase: effectiveSalaryBase,
       salaryBonus: Number(salaryBonus.toFixed(2)),
       salaryTotal: Number(salaryTotal.toFixed(2)),
     };

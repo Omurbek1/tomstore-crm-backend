@@ -55,6 +55,33 @@ export class UsersService {
     >;
   }
 
+  private normalizeManagedBranches(
+    payload: Partial<UserEntity>,
+  ): Partial<UserEntity> {
+    const result: Partial<UserEntity> = {};
+
+    if (payload.managedBranchIds !== undefined) {
+      const ids = Array.isArray(payload.managedBranchIds)
+        ? payload.managedBranchIds
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        : [];
+      result.managedBranchIds = ids.length > 0 ? Array.from(new Set(ids)) : [];
+    }
+
+    if (payload.managedBranchNames !== undefined) {
+      const names = Array.isArray(payload.managedBranchNames)
+        ? payload.managedBranchNames
+            .map((value) => String(value || '').trim())
+            .filter(Boolean)
+        : [];
+      result.managedBranchNames =
+        names.length > 0 ? Array.from(new Set(names)) : [];
+    }
+
+    return result;
+  }
+
   async findAll(limit?: number, offset?: number) {
     const take = Math.max(1, Math.min(500, Number(limit ?? 200)));
     const skip = Math.max(0, Number(offset ?? 0));
@@ -116,6 +143,7 @@ export class UsersService {
           : payload.birthYear,
       branchId: payload.branchId,
       branchName: payload.branchName,
+      ...this.normalizeManagedBranches(payload),
     };
 
     if (
@@ -137,6 +165,13 @@ export class UsersService {
       !normalizedPayload.roles.includes('storekeeper')
     ) {
       normalizedPayload.canManageProducts = false;
+    }
+    if (
+      normalizedPayload.roles &&
+      !normalizedPayload.roles.includes('superadmin')
+    ) {
+      normalizedPayload.managedBranchIds = undefined;
+      normalizedPayload.managedBranchNames = undefined;
     }
 
     await this.usersRepo.update(id, normalizedPayload);
@@ -235,7 +270,9 @@ export class UsersService {
             )
         ), 0) AS "salaryPaidMonth",
         COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф')), 0) AS "advances",
-        COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "advancesMonth"
+        COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "advancesMonth",
+        COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" NOT IN ('Аванс', 'Штраф')), 0) AS "managerExpenses",
+        COALESCE((SELECT SUM(e."amount") FROM expenses e WHERE e."managerId" = $1 AND e."category" NOT IN ('Аванс', 'Штраф') AND e."createdAt" >= date_trunc('month', now())), 0) AS "managerExpensesMonth"
       `,
       [id],
     );
@@ -246,8 +283,11 @@ export class UsersService {
       (isFixed ? row?.salaryPaidMonth : row?.salaryPaid) ?? 0,
     );
     const advances = Number((isFixed ? row?.advancesMonth : row?.advances) ?? 0);
+    const managerExpenses = Number(
+      (isFixed ? row?.managerExpensesMonth : row?.managerExpenses) ?? 0,
+    );
     const fixedBase = isFixed ? Number(user.fixedMonthlySalary ?? 0) : 0;
-    const available = fixedBase + earned - bonuses - advances;
+    const available = fixedBase + earned - bonuses - advances - managerExpenses;
 
     return {
       managerId: id,
@@ -256,6 +296,7 @@ export class UsersService {
       earned,
       bonuses,
       advances,
+      managerExpenses,
       available,
       maxPayable: Math.max(0, available),
       debt: Math.min(0, available),

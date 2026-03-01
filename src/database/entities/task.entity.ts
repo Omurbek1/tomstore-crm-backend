@@ -47,6 +47,9 @@ export class TaskEntity {
   @Column({ type: 'timestamp', nullable: true })
   completedAt?: Date | null;
 
+  @Column({ type: 'text', array: true, default: '{}' })
+  attachmentUrls: string[];
+
   @CreateDateColumn()
   createdAt: Date;
 

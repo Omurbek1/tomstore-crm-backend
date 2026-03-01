@@ -58,11 +58,6 @@ export class ClientsController {
     return this.clientsService.removePromotion(id);
   }
 
-  @Post(':id/sms')
-  sendSms(@Param('id') id: string, @Body('message') message?: string) {
-    return this.clientsService.sendSms(id, message || '');
-  }
-
   @Patch(':id')
   update(
     @Param('id') id: string,

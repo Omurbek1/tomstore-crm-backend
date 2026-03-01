@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { MarketingKpiService } from './marketing-kpi.service';
 import { MarketingKpiEntity } from '../database/entities/marketing-kpi.entity';
 
@@ -16,7 +24,29 @@ export class MarketingKpiController {
   ) {
     const limit = limitRaw !== undefined ? Number(limitRaw) : undefined;
     const offset = offsetRaw !== undefined ? Number(offsetRaw) : undefined;
-    return this.marketingKpiService.findAll({ month, managerId, q, limit, offset });
+    return this.marketingKpiService.findAll({
+      month,
+      managerId,
+      q,
+      limit,
+      offset,
+    });
+  }
+
+  @Get('insights')
+  insights(
+    @Query('month') month?: string,
+    @Query('managerId') managerId?: string,
+    @Query('q') q?: string,
+  ) {
+    const normalizedMonth =
+      String(month || '').trim() ||
+      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+    return this.marketingKpiService.getInsights({
+      month: normalizedMonth,
+      managerId,
+      q,
+    });
   }
 
   @Post()
